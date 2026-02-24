@@ -1,11 +1,12 @@
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// entra na pasta /server (pra distPath ../dist funcionar)
-process.chdir(path.join(__dirname, "server"));
+// força o "cwd" virar /server (porque seu backend usa process.cwd())
+const serverDir = path.join(__dirname, "server");
+process.chdir(serverDir);
 
 // inicia o backend real
-await import("./server/src/index.js");
+await import(pathToFileURL(path.join(serverDir, "src", "index.js")).href);
