@@ -1,3 +1,5 @@
+// server.js (RAIZ DO PROJETO)
+import './server/src/index.js';
 import { fileURLToPath } from "url";
 import path from "path";
 
