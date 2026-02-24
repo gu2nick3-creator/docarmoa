@@ -54,10 +54,17 @@ const __dirname = path.dirname(__filename);
 // raiz real do projeto (…/server/src -> volta 2 níveis)
 const baseDir = path.resolve(__dirname, '..', '..');
 
-// Static uploads (…/uploads na raiz)
-const uploadsDir = path.join(baseDir, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-app.use('/uploads', express.static(uploadsDir));
+let uploadsDir = path.resolve(process.cwd(), "uploads");
+
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+  uploadsDir = path.resolve("/tmp", "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  console.error("Uploads sem permissão no projeto. Usando:", uploadsDir, e);
+}
+
+app.use("/uploads", express.static(uploadsDir));
 
 // Serve frontend build if available (…/dist na raiz)
 const distPath = path.join(baseDir, 'dist');
