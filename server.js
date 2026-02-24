@@ -1,45 +1,23 @@
-import http from "http";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const PORT = Number(process.env.PORT || 4000);
+process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e));
+process.on("uncaughtException", (e) => {
+  console.error("uncaughtException:", e);
+  process.exit(1);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function startFallback(err) {
-  console.error("BOOT ERROR:", err);
+// Inicia o backend dentro da pasta /server (onde está o Express + Prisma)
+const serverDir = path.join(__dirname, "server");
+const entry = path.join(serverDir, "src", "index.js");
 
-  const body = `BOOT ERROR:\n\n${err?.stack || String(err)}\n`;
-
-  const server = http.createServer((req, res) => {
-    res.statusCode = 500;
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.end(body);
-  });
-
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log("Fallback server listening on port", PORT);
-  });
+try {
+  process.chdir(serverDir);
+  await import(pathToFileURL(entry).href);
+} catch (err) {
+  console.error("FATAL: não consegui iniciar o backend:", err);
+  process.exit(1);
 }
-
-(async () => {
-  try {
-    // Se existir /server, roda a API de dentro dele.
-    const serverDir = fs.existsSync(path.join(__dirname, "server"))
-      ? path.join(__dirname, "server")
-      : __dirname;
-
-    process.chdir(serverDir);
-
-    // Entry real:
-    const entryPath = fs.existsSync(path.join(serverDir, "src", "index.js"))
-      ? path.join(serverDir, "src", "index.js")
-      : path.join(serverDir, "server", "src", "index.js");
-
-    await import(pathToFileURL(entryPath).href);
-  } catch (err) {
-    startFallback(err);
-  }
-})();
