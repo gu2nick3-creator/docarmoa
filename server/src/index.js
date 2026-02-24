@@ -42,18 +42,36 @@ app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
-// Static uploads (com fallback pra /tmp se não tiver permissão)
-let uploadsDir = path.resolve(process.cwd(), "uploads");
+// Static uploads (com fallback pra /tmp se der permissão negada)
+let uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.resolve(process.cwd(), "uploads");
 
 try {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 } catch (e) {
-  uploadsDir = path.resolve("/tmp", "uploads");
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  console.error("Sem permissão pra uploads no projeto. Usando:", uploadsDir, e);
+  console.error("Uploads dir not writable, falling back to /tmp", e);
+  uploadsDir = path.join(process.env.TMPDIR || "/tmp", "uploads");
+  try {
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  } catch (e2) {
+    console.error("Fallback /tmp uploads failed too", e2);
+  }
 }
 
 app.use("/uploads", express.static(uploadsDir));
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: uploadsDir,
+    filename: (req, file, cb) => {
+      const safe = slugify(file.originalname.replace(/\.[^/.]+$/, "")) || "file";
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}-${safe}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 // raiz real do projeto (…/server/src -> volta 2 níveis)
 const baseDir = path.resolve(__dirname, '..', '..');
