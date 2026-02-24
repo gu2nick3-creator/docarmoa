@@ -31,13 +31,39 @@ const prisma = new PrismaClient();
 
 const app = express();
 
-const PORT = Number(process.env.PORT || 4000);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:8080';
+// ✅ Hostinger geralmente expõe na porta 3000 (e define PORT automaticamente)
+const PORT = Number(process.env.PORT || 3000);
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+// ✅ CORS: aceita seu domínio (e localhost pra testes)
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://docarmo.store';
+
+app.set('trust proxy', 1);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      // sem origin = curl/postman/server-to-server
+      if (!origin) return cb(null, true);
+
+      const allowed = new Set([
+        CORS_ORIGIN,
+        'https://www.docarmo.store',
+        'http://localhost:8080',
+        'http://localhost:5173',
+      ]);
+
+      return allowed.has(origin) ? cb(null, true) : cb(new Error('CORS_BLOCKED'));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
@@ -160,7 +186,13 @@ app.get('/api/admin/me', requireAuth, async (req, res) => {
 // Admin: upload
 app.post('/api/admin/upload', requireAuth, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'missing_file' });
-  const publicUrl = `${process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`}/uploads/${req.file.filename}`;
+
+  const base =
+    process.env.PUBLIC_BASE_URL ||
+    process.env.PUBLIC_URL ||
+    `http://localhost:${PORT}`;
+
+  const publicUrl = `${base.replace(/\/$/, '')}/uploads/${req.file.filename}`;
   res.json({ url: publicUrl });
 });
 
@@ -342,12 +374,10 @@ app.post('/api/checkout', async (req, res) => {
 
   const { items, buyer } = parsed.data;
 
-  // Load products
   const ids = [...new Set(items.map(i => i.productId))];
   const products = await prisma.product.findMany({ where: { id: { in: ids } } });
   const byId = new Map(products.map(p => [p.id, p]));
 
-  // Validate cart
   const orderItems = [];
   let totalCents = 0;
   for (const it of items) {
@@ -376,7 +406,6 @@ app.post('/api/checkout', async (req, res) => {
     },
   });
 
-  // Mercado Pago preference
   const accessToken = process.env.MP_ACCESS_TOKEN;
   if (!accessToken) {
     return res.status(500).json({ error: 'mp_access_token_missing', orderNumber: order.orderNumber });
@@ -386,6 +415,11 @@ app.post('/api/checkout', async (req, res) => {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
 
+    const base =
+      process.env.PUBLIC_BASE_URL ||
+      process.env.PUBLIC_URL ||
+      `http://localhost:${PORT}`;
+
     const preferenceBody = {
       items: orderItems.map(oi => ({
         title: oi.product.name,
@@ -394,11 +428,11 @@ app.post('/api/checkout', async (req, res) => {
         currency_id: 'BRL',
       })),
       external_reference: order.orderNumber,
-      notification_url: `${process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`}/api/webhooks/mercadopago`,
+      notification_url: `${base.replace(/\/$/, '')}/api/webhooks/mercadopago`,
       back_urls: {
-        success: `${process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`}/pagamento/sucesso?o=${order.orderNumber}`,
-        pending: `${process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`}/pagamento/pendente?o=${order.orderNumber}`,
-        failure: `${process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`}/pagamento/erro?o=${order.orderNumber}`,
+        success: `${base.replace(/\/$/, '')}/pagamento/sucesso?o=${order.orderNumber}`,
+        pending: `${base.replace(/\/$/, '')}/pagamento/pendente?o=${order.orderNumber}`,
+        failure: `${base.replace(/\/$/, '')}/pagamento/erro?o=${order.orderNumber}`,
       },
       auto_return: 'approved',
     };
@@ -424,7 +458,6 @@ app.post('/api/checkout', async (req, res) => {
 
 // Webhook Mercado Pago
 app.post('/api/webhooks/mercadopago', async (req, res) => {
-  // Always respond quickly
   res.status(200).send('OK');
 
   try {
@@ -473,7 +506,7 @@ if (fs.existsSync(distPath)) {
 
 // Startup
 app.listen(PORT, async () => {
-  console.log(`API running on http://localhost:${PORT}`);
+  console.log(`API running on port ${PORT}`);
 });
 
 process.on('SIGINT', async () => {
