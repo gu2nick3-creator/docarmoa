@@ -42,14 +42,18 @@ app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
-// Static uploads
-const PORT = Number(process.env.PORT || 3000);
+// Static uploads (com fallback pra /tmp se não tiver permissão)
+let uploadsDir = path.resolve(process.cwd(), "uploads");
 
-process.on('unhandledRejection', (e) => console.error('unhandledRejection', e));
-process.on('uncaughtException', (e) => console.error('uncaughtException', e));
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+  uploadsDir = path.resolve("/tmp", "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  console.error("Sem permissão pra uploads no projeto. Usando:", uploadsDir, e);
+}
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+app.use("/uploads", express.static(uploadsDir));
 
 // raiz real do projeto (…/server/src -> volta 2 níveis)
 const baseDir = path.resolve(__dirname, '..', '..');
