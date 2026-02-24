@@ -1,32 +1,31 @@
 {
-  "name": "do-carmo-backend",
-  "private": true,
+  "name": "docarmo-server",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "seed": "node src/seed.js",
-    "postinstall": "prisma generate",
-    "prisma:push": "prisma db push"
+    "dev": "node src/index.js",
+    "prisma": "node ./node_modules/prisma/build/index.js",
+    "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
+    "prisma:push": "node ./node_modules/prisma/build/index.js db push",
+    "postinstall": "node ./node_modules/prisma/build/index.js generate"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^5.18.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mercadopago": "^2.0.12",
+    "mercadopago": "^2.0.16",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "nanoid": "^5.0.7",
-    "zod": "^3.25.76",
-    "prisma": "^5.22.0"
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "prisma": "^5.18.0"
+  }
 }
