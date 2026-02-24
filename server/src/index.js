@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url';
 import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
@@ -42,21 +43,30 @@ app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
 // Static uploads
-const uploadsDir = path.resolve(process.cwd(), 'uploads');
+const PORT = Number(process.env.PORT || 3000);
+
+process.on('unhandledRejection', (e) => console.error('unhandledRejection', e));
+process.on('uncaughtException', (e) => console.error('uncaughtException', e));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// raiz real do projeto (…/server/src -> volta 2 níveis)
+const baseDir = path.resolve(__dirname, '..', '..');
+
+// Static uploads (…/uploads na raiz)
+const uploadsDir = path.join(baseDir, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use('/uploads', express.static(uploadsDir));
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: uploadsDir,
-    filename: (req, file, cb) => {
-      const safe = slugify(file.originalname.replace(/\.[^/.]+$/, '')) || 'file';
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${Date.now()}-${safe}${ext}`);
-    },
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
+// Serve frontend build if available (…/dist na raiz)
+const distPath = path.join(baseDir, 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 function safeJsonParse(schema, data) {
   const parsed = schema.safeParse(data);
